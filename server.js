@@ -24,8 +24,9 @@ const path = require('path');
 
 // ✅ CORS for frontend + OPTIONS preflight
 app.use(cors({
-  origin: ["http://localhost:3000","http://localhost:3001"],
-  credentials: true,
+  
+    origin: "https://ecommerce-frontend-gold-six.vercel.app",
+    credentials: true,
   methods: ["GET","POST","PUT","DELETE","OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
 }));
