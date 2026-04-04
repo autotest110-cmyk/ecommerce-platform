@@ -31,8 +31,12 @@ const path = require('path');
   //allowedHeaders: ["Content-Type", "Authorization"],
 //}));
 
-app.options("*", cors()); // 👈 THIS LINE IS CRITICAL
 
+app.use(cors({
+  origin: true,
+  credentials: true
+}));
+app.options("*", cors()); // 👈 THIS LINE IS CRITICAL
 
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
