@@ -22,18 +22,28 @@ app.use(morgan('dev'));
 const path = require('path');
 
 
-// ✅ CORS for frontend + OPTIONS preflight
-//app.use(cors({
-  
-  //  origin: "https://ecommerce-frontend-gold-six.vercel.app",
-   // credentials: true,
-  //methods: ["GET","POST","PUT","DELETE","OPTIONS"],
-  //allowedHeaders: ["Content-Type", "Authorization"],
-//}));
-app.use(cors({
-  origin: true,
-  credentials: true
-}));
+const allowedOrigins = [
+  "http://localhost:3000","http://localhost:3001",
+  "https://ecommerce-frontend-gold-six.vercel.app",
+  "https://shop.autotest.in",
+  "https://admin1.autotest.in"
+];
+
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      // allow requests with no origin (like mobile apps / Postman)
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      } else {
+        return callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true,
+  })
+);
 
 app.options("*", cors()); // 👈 THIS LINE IS CRITICAL
 
