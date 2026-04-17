@@ -21,33 +21,76 @@ const generateOTP = () =>
   Math.floor(100000 + Math.random() * 900000).toString();
 
 router.post("/register", async (req, res) => {
-  const { name, email, password } = req.body;
+  try {
+    const { name, email, password } = req.body;
 
-  let user = await User.findOne({ email });
-  const otp = generateOTP();
-  const hashedPassword = await bcrypt.hash(password, 10);
+    // ✅ 1. VALIDATION
+    if (!name || !email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "All fields are required",
+      });
+    }
 
-  if (!user) {
-    user = new User({
-      name,
+    // ✅ 2. EMAIL FORMAT CHECK
+    const emailRegex = /\S+@\S+\.\S+/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid email format",
+      });
+    }
+
+    // ✅ 3. CHECK EXISTING USER
+    let user = await User.findOne({ email });
+
+    const otp = generateOTP();
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    if (!user) {
+      user = new User({
+        name,
+        email,
+        password: hashedPassword,
+      });
+    }
+
+    user.otp = otp;
+    user.otpExpires = Date.now() + 10 * 60 * 1000;
+    user.isVerified = false;
+
+    await user.save();
+
+    // ✅ 4. SAFE EMAIL SEND (IMPORTANT FIX)
+    try {
+      await sendEmail({
+        to: email,
+        subject: "Verify Email",
+        html: `<h2>Your OTP: ${otp}</h2>`,
+      });
+    } catch (error) {
+      console.error("❌ EMAIL ERROR:", error);
+
+      return res.status(500).json({
+        success: false,
+        message: "Failed to send OTP. Please check email.",
+      });
+    }
+
+    // ✅ 5. SUCCESS RESPONSE
+    return res.json({
+      success: true,
+      message: "OTP sent successfully",
       email,
-      password: hashedPassword,
+    });
+
+  } catch (err) {
+    console.error("🔥 REGISTER ERROR:", err);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
     });
   }
-
-  user.otp = otp;
-  user.otpExpires = Date.now() + 10 * 60 * 1000;
-  user.isVerified = false;
-
-  await user.save();
-
-  await sendEmail({
-    to: email,
-    subject: "Verify Email",
-    html: `<h2>Your OTP: ${otp}</h2>`
-  });
-
-  res.json({ message: "OTP sent", email });
 });
 
 /* ===============================
@@ -58,11 +101,26 @@ router.post("/verify-otp", async (req, res) => {
 
   const user = await User.findOne({ email });
 
-  if (!user || user.otp !== otp)
-    return res.status(400).json({ message: "Invalid OTP" });
+if (!user) {
+  return res.status(400).json({
+    success: false,
+    message: "Email not found",
+  });
+}
 
-  if (user.otpExpires < Date.now())
-    return res.status(400).json({ message: "OTP expired" });
+if (user.otp !== otp) {
+  return res.status(400).json({
+    success: false,
+    message: "Invalid OTP",
+  });
+}
+
+if (user.otpExpires < Date.now()) {
+  return res.status(400).json({
+    success: false,
+    message: "OTP expired",
+  });
+}
 
   user.isVerified = true;
   user.otp = undefined;
