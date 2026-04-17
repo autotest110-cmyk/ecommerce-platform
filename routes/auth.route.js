@@ -13,17 +13,16 @@ router.get('/', auth, async (req, res) => {
   const user = await User.findById(req.user.id).select('-password');
   res.json(user);
 });
+const emailValidator = require("deep-email-validator");
 
 /* ===============================
    REGISTER WITH OTP
 ================================ */
-const generateOTP = () =>
-  Math.floor(100000 + Math.random() * 900000).toString();
-
 router.post("/register", async (req, res) => {
   try {
     const { name, email, password } = req.body;
 
+    // ✅ Basic validation
     if (!name || !email || !password) {
       return res.status(400).json({
         success: false,
@@ -31,9 +30,21 @@ router.post("/register", async (req, res) => {
       });
     }
 
+    // ✅ 🔥 REAL EMAIL CHECK (NEW)
+    const validation = await emailValidator.validate(email);
+
+    console.log("📧 EMAIL VALIDATION:", validation);
+
+    if (!validation.valid) {
+      return res.status(400).json({
+        success: false,
+        message: "Email does not exist or is invalid",
+      });
+    }
+
     let user = await User.findOne({ email });
 
-    const otp = generateOTP();
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const hashedPassword = await bcrypt.hash(password, 10);
 
     if (!user) {
@@ -50,7 +61,7 @@ router.post("/register", async (req, res) => {
 
     await user.save();
 
-    // ✅ IMPORTANT FIX HERE
+    // ✅ Send email
     const emailSent = await sendEmail({
       to: email,
       subject: "Verify Email",
@@ -60,7 +71,7 @@ router.post("/register", async (req, res) => {
     if (!emailSent) {
       return res.status(400).json({
         success: false,
-        message: "Email not valid or OTP failed to send",
+        message: "Failed to send OTP. Try again.",
       });
     }
 
@@ -78,7 +89,6 @@ router.post("/register", async (req, res) => {
     });
   }
 });
-
 /* ===============================
    LOGIN
 ================================ */
