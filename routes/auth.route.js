@@ -24,45 +24,13 @@ router.post("/register", async (req, res) => {
   try {
     const { name, email, password } = req.body;
 
-    // ✅ BETTER VALIDATION (FIELD-WISE)
-    if (!name && !email && !password) {
+    if (!name || !email || !password) {
       return res.status(400).json({
         success: false,
         message: "All fields are required",
       });
     }
 
-    if (!name) {
-      return res.status(400).json({
-        success: false,
-        message: "Name is required",
-      });
-    }
-
-    if (!email) {
-      return res.status(400).json({
-        success: false,
-        message: "Email is required",
-      });
-    }
-
-    if (!password) {
-      return res.status(400).json({
-        success: false,
-        message: "Password is required",
-      });
-    }
-
-    // ✅ EMAIL FORMAT CHECK
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid email format",
-      });
-    }
-
-    // ✅ CHECK EXISTING USER
     let user = await User.findOne({ email });
 
     const otp = generateOTP();
@@ -82,29 +50,20 @@ router.post("/register", async (req, res) => {
 
     await user.save();
 
-    // ✅ SAFE EMAIL SEND
-    try {
-      await sendEmail({
-        to: email,
-        subject: "Verify Email",
-        html: `<h2>Your OTP: ${otp}</h2>`,
-      });
-       return res.json({
-        success: true,
-        message: "OTP sent successfully",
-        email,
-      });
-    } catch (error) {
-      console.error("❌ EMAIL ERROR:", error);
+    // ✅ IMPORTANT FIX HERE
+    const emailSent = await sendEmail({
+      to: email,
+      subject: "Verify Email",
+      html: `<h2>Your OTP: ${otp}</h2>`,
+    });
 
-     
-         return res.status(400).json({
+    if (!emailSent) {
+      return res.status(400).json({
         success: false,
-        message: "Invalid email or unable to send OTP",
+        message: "Email not valid or OTP failed to send",
       });
     }
 
-    // ✅ SUCCESS
     return res.json({
       success: true,
       message: "OTP sent successfully",
@@ -113,71 +72,6 @@ router.post("/register", async (req, res) => {
 
   } catch (err) {
     console.error("🔥 REGISTER ERROR:", err);
-    res.status(500).json({
-      success: false,
-      message: "Server error",
-    });
-  }
-});
-
-/* ===============================
-   VERIFY OTP
-================================ */
-router.post("/verify-otp", async (req, res) => {
-  try {
-    const { email, otp } = req.body;
-
-    if (!email || !otp) {
-      return res.status(400).json({
-        success: false,
-        message: "Email and OTP are required",
-      });
-    }
-
-    const user = await User.findOne({ email });
-
-    if (!user) {
-      return res.status(400).json({
-        success: false,
-        message: "Email not found",
-      });
-    }
-
-    if (user.otp !== otp) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid OTP",
-      });
-    }
-
-    if (user.otpExpires < Date.now()) {
-      return res.status(400).json({
-        success: false,
-        message: "OTP expired",
-      });
-    }
-
-    user.isVerified = true;
-    user.otp = undefined;
-    user.otpExpires = undefined;
-
-    await user.save();
-
-    const token = jwt.sign(
-      { id: user._id, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
-
-    res.json({
-      success: true,
-      message: "OTP verified successfully",
-      token,
-      user
-    });
-
-  } catch (err) {
-    console.error("🔥 VERIFY OTP ERROR:", err);
     res.status(500).json({
       success: false,
       message: "Server error",
