@@ -24,16 +24,37 @@ router.post("/register", async (req, res) => {
   try {
     const { name, email, password } = req.body;
 
-    // ✅ 1. VALIDATION
-    if (!name || !email || !password) {
+    // ✅ BETTER VALIDATION (FIELD-WISE)
+    if (!name && !email && !password) {
       return res.status(400).json({
         success: false,
         message: "All fields are required",
       });
     }
 
-    // ✅ 2. EMAIL FORMAT CHECK
-    const emailRegex = /\S+@\S+\.\S+/;
+    if (!name) {
+      return res.status(400).json({
+        success: false,
+        message: "Name is required",
+      });
+    }
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required",
+      });
+    }
+
+    if (!password) {
+      return res.status(400).json({
+        success: false,
+        message: "Password is required",
+      });
+    }
+
+    // ✅ EMAIL FORMAT CHECK
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       return res.status(400).json({
         success: false,
@@ -41,7 +62,7 @@ router.post("/register", async (req, res) => {
       });
     }
 
-    // ✅ 3. CHECK EXISTING USER
+    // ✅ CHECK EXISTING USER
     let user = await User.findOne({ email });
 
     const otp = generateOTP();
@@ -61,7 +82,7 @@ router.post("/register", async (req, res) => {
 
     await user.save();
 
-    // ✅ 4. SAFE EMAIL SEND (IMPORTANT FIX)
+    // ✅ SAFE EMAIL SEND
     try {
       await sendEmail({
         to: email,
@@ -77,7 +98,7 @@ router.post("/register", async (req, res) => {
       });
     }
 
-    // ✅ 5. SUCCESS RESPONSE
+    // ✅ SUCCESS
     return res.json({
       success: true,
       message: "OTP sent successfully",
@@ -97,44 +118,65 @@ router.post("/register", async (req, res) => {
    VERIFY OTP
 ================================ */
 router.post("/verify-otp", async (req, res) => {
-  const { email, otp } = req.body;
+  try {
+    const { email, otp } = req.body;
 
-  const user = await User.findOne({ email });
+    if (!email || !otp) {
+      return res.status(400).json({
+        success: false,
+        message: "Email and OTP are required",
+      });
+    }
 
-if (!user) {
-  return res.status(400).json({
-    success: false,
-    message: "Email not found",
-  });
-}
+    const user = await User.findOne({ email });
 
-if (user.otp !== otp) {
-  return res.status(400).json({
-    success: false,
-    message: "Invalid OTP",
-  });
-}
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: "Email not found",
+      });
+    }
 
-if (user.otpExpires < Date.now()) {
-  return res.status(400).json({
-    success: false,
-    message: "OTP expired",
-  });
-}
+    if (user.otp !== otp) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid OTP",
+      });
+    }
 
-  user.isVerified = true;
-  user.otp = undefined;
-  user.otpExpires = undefined;
+    if (user.otpExpires < Date.now()) {
+      return res.status(400).json({
+        success: false,
+        message: "OTP expired",
+      });
+    }
 
-  await user.save();
+    user.isVerified = true;
+    user.otp = undefined;
+    user.otpExpires = undefined;
 
-  const token = jwt.sign(
-    { id: user._id, role: user.role },
-    process.env.JWT_SECRET,
-    { expiresIn: "7d" }
-  );
+    await user.save();
 
-  res.json({ token, user });
+    const token = jwt.sign(
+      { id: user._id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    res.json({
+      success: true,
+      message: "OTP verified successfully",
+      token,
+      user
+    });
+
+  } catch (err) {
+    console.error("🔥 VERIFY OTP ERROR:", err);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
 });
 
 /* ===============================
@@ -142,34 +184,52 @@ if (user.otpExpires < Date.now()) {
 ================================ */
 router.post("/login", async (req, res) => {
   try {
-    console.log("👉 LOGIN BODY:", req.body);
-
     const { email, password } = req.body;
 
-    if (!email || !password) {
-      console.log("❌ Missing email or password");
-      return res.status(400).json({ message: "Email & password required" });
+    if (!email && !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Email and password required",
+      });
+    }
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required",
+      });
+    }
+
+    if (!password) {
+      return res.status(400).json({
+        success: false,
+        message: "Password is required",
+      });
     }
 
     const user = await User.findOne({ email });
-    console.log("👉 USER FOUND:", user);
 
     if (!user) {
-      console.log("❌ User not found");
-      return res.status(400).json({ message: "Invalid credentials" });
+      return res.status(400).json({
+        success: false,
+        message: "Email not registered",
+      });
     }
 
     if (!user.isVerified) {
-      console.log("❌ User not verified");
-      return res.status(403).json({ message: "Verify email first" });
+      return res.status(403).json({
+        success: false,
+        message: "Please verify your email first",
+      });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
-    console.log("👉 PASSWORD MATCH:", isMatch);
 
     if (!isMatch) {
-      console.log("❌ Wrong password");
-      return res.status(400).json({ message: "Invalid credentials" });
+      return res.status(400).json({
+        success: false,
+        message: "Incorrect password",
+      });
     }
 
     const token = jwt.sign(
@@ -178,9 +238,9 @@ router.post("/login", async (req, res) => {
       { expiresIn: "4h" }
     );
 
-    console.log("✅ LOGIN SUCCESS");
-
     res.json({
+      success: true,
+      message: "Login successful",
       token,
       user: {
         _id: user._id,
@@ -193,9 +253,13 @@ router.post("/login", async (req, res) => {
 
   } catch (err) {
     console.error("🔥 LOGIN ERROR:", err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
   }
 });
+
 /* ===============================
    ADDRESS APIs
 ================================ */
@@ -208,20 +272,24 @@ router.post("/address", auth, async (req, res) => {
 
   res.json(user.addresses);
 });
+
 router.get("/profile", auth, async (req, res) => {
   try {
-    console.log("👉 PROFILE API HIT");
-
     const user = await User.findById(req.user.id).select("-password");
 
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
     }
 
     res.json(user);
   } catch (err) {
-    console.error("PROFILE ERROR:", err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
   }
 });
 
@@ -240,35 +308,58 @@ router.delete("/address/:id", auth, async (req, res) => {
   await user.save();
   res.json(user.addresses);
 });
+
+/* ===============================
+   ADMIN LOGIN
+================================ */
 router.post("/admin-login", async (req, res) => {
-     try {
-   console.log("[ADMIN LOGIN] body:", req.body);
-  const { email, password } = req.body;
+  try {
+    const { email, password } = req.body;
 
-  const user = await User.findOne({ email });
-  if (!user) {
-    return res.status(400).json({ message: "Invalid credentials" });
-  }
+    const user = await User.findOne({ email });
 
-  if (user.role !== "admin") {
-    return res.status(403).json({ message: "Not an admin" });
-  }
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: "Admin not found",
+      });
+    }
 
-  const isMatch = await bcrypt.compare(password, user.password);
-  if (!isMatch) {
-    return res.status(400).json({ message: "Invalid credentials" });
-  }
+    if (user.role !== "admin") {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied (not admin)",
+      });
+    }
 
-  const token = jwt.sign(
-    { user: { id: user._id, role: user.role } },
-    process.env.JWT_SECRET,
-    { expiresIn: "4h" }
-  );
+    const isMatch = await bcrypt.compare(password, user.password);
 
-  res.json({ token, user });
+    if (!isMatch) {
+      return res.status(400).json({
+        success: false,
+        message: "Incorrect password",
+      });
+    }
+
+    const token = jwt.sign(
+      { user: { id: user._id, role: user.role } },
+      process.env.JWT_SECRET,
+      { expiresIn: "4h" }
+    );
+
+    res.json({
+      success: true,
+      message: "Admin login successful",
+      token,
+      user
+    });
+
   } catch (err) {
     console.error("[ADMIN LOGIN ERROR]", err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
   }
 });
 
