@@ -13,16 +13,6 @@ const sendEmail = async ({ to, subject, html }) => {
       },
     });
 
-    console.log("📧 Sending OTP email...");
-    console.log("📧 From:", process.env.EMAIL_USER);
-    console.log("📧 To:", to);
-
-    console.log("🔍 Verifying Gmail SMTP connection...");
-
-    await transporter.verify();
-
-    console.log("✅ Gmail SMTP connection verified");
-
     const info = await transporter.sendMail({
       from: `"AutoTest OTP" <${process.env.EMAIL_USER}>`,
       to,
@@ -30,22 +20,15 @@ const sendEmail = async ({ to, subject, html }) => {
       html,
     });
 
-    console.log("✅ Email sent successfully");
-    console.log("📧 Message ID:", info.messageId);
-    console.log("📧 Accepted:", info.accepted);
-    console.log("📧 Rejected:", info.rejected);
+    console.log("✅ OTP email sent:", info.messageId);
 
     return true;
 
   } catch (error) {
-    console.error("❌ OTP EMAIL ERROR");
-    console.error("Code:", error.code);
-    console.error("Command:", error.command);
-    console.error("Response:", error.response);
-    console.error("Message:", error.message);
-
+    console.error("❌ OTP email failed:", error.message);
     throw error;
   }
 };
 
 module.exports = sendEmail;
+

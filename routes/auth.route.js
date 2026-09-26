@@ -13,7 +13,7 @@ router.get('/', auth, async (req, res) => {
   const user = await User.findById(req.user.id).select('-password');
   res.json(user);
 });
-const emailValidator = require("deep-email-validator");
+
 
 /* ===============================
    REGISTER WITH OTP
@@ -21,89 +21,51 @@ const emailValidator = require("deep-email-validator");
 router.post("/register", async (req, res) => {
   try {
     const { name, email, password } = req.body;
-
-    // ✅ Basic validation
-    if (!name || !email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: "All fields are required",
-      });
-    }
-
-    // ✅ 🔥 REAL EMAIL CHECK (NEW)
-// ✅ EMAIL VALIDATION
-const validation = await emailValidator.validate(email);
-
-console.log("📧 EMAIL VALIDATION:", validation);
-
-// Reject only if basic email/domain checks fail
-if (!validation.validators.regex.valid) {
-  return res.status(400).json({
-    success: false,
-    message: "Please enter a valid email address.",
-  });
-}
-
-if (!validation.validators.typo.valid) {
-  return res.status(400).json({
-    success: false,
-    message: "Please check the email address for typing errors.",
-  });
-}
-
-if (!validation.validators.disposable.valid) {
-  return res.status(400).json({
-    success: false,
-    message: "Disposable email addresses are not allowed.",
-  });
-}
-
-if (!validation.validators.mx.valid) {
-  return res.status(400).json({
-    success: false,
-    message: "This email domain cannot receive emails.",
-  });
-}
-
-// SMTP verification is not mandatory.
-// Some legitimate email providers block SMTP mailbox verification.
-if (!validation.validators.smtp.valid) {
-  console.warn(
-    "⚠️ SMTP verification failed, continuing with OTP verification:",
-    validation.validators.smtp.reason
-  );
-}
-
+    //Required fields only
+    if (!name || !email || !password) { return res.status(400).json({ success: false, message: "All fields are required", }); }
+    // Find existing user
     let user = await User.findOne({ email });
-
+    // Generate OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    // Hash password 
     const hashedPassword = await bcrypt.hash(password, 10);
+    // Create user if not exists 
+    if (!user) { user = new User({ name, email, password: hashedPassword, }); }
+    // Update OTP
+    user.otp = otp; user.otpExpires = Date.now() + 10 * 60 * 1000;
+    user.isVerified = false; await user.save();
+    // Send OTP email
+    try {
+      await sendEmail({
+        to: email,
+        subject: "Verify Your Email - AutoTest",
+        html: `
+          <div style="font-family: Arial, sans-serif;">
+            <h2>Verify Your Email</h2>
 
-    if (!user) {
-      user = new User({
-        name,
-        email,
-        password: hashedPassword,
+            <p>Hello ${name},</p>
+
+            <p>Your OTP is:</p>
+
+            <h1>${otp}</h1>
+
+            <p>This OTP is valid for 10 minutes.</p>
+
+            <p>If you did not request this OTP, please ignore this email.</p>
+
+            <p>
+              Regards,<br>
+              AutoTest Team
+            </p>
+          </div>
+        `,
       });
-    }
+    } catch (emailError) {
+      console.error("❌ Unable to send OTP email:", emailError);
 
-    user.otp = otp;
-    user.otpExpires = Date.now() + 10 * 60 * 1000;
-    user.isVerified = false;
-
-    await user.save();
-
-    // ✅ Send email
-    const emailSent = await sendEmail({
-      to: email,
-      subject: "Verify Email",
-      html: `<h2>Your OTP: ${otp}</h2>`,
-    });
-
-    if (!emailSent) {
-      return res.status(400).json({
+      return res.status(500).json({
         success: false,
-        message: "Failed to send OTP. Try again.",
+        message: "Unable to send OTP email. Please try again.",
       });
     }
 
@@ -115,7 +77,8 @@ if (!validation.validators.smtp.valid) {
 
   } catch (err) {
     console.error("🔥 REGISTER ERROR:", err);
-    res.status(500).json({
+
+    return res.status(500).json({
       success: false,
       message: "Server error",
     });
