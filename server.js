@@ -22,30 +22,9 @@ app.use(morgan('dev'));
 const path = require('path');
 
 
-const allowedOrigins = [
-  "http://localhost:3000","http://localhost:3001",
-  "https://ecommerce-frontend-gold-six.vercel.app",
-  "https://shop.autotest.in",
-  "https://admin1.autotest.in"
-];
+app.use(cors());
 
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      // allow requests with no origin (like mobile apps / Postman)
-      if (!origin) return callback(null, true);
 
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      } else {
-        return callback(new Error("Not allowed by CORS"));
-      }
-    },
-    credentials: true,
-  })
-);
-
-app.options("*", cors()); // 👈 THIS LINE IS CRITICAL
 
 
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
