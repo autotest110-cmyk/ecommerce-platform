@@ -3,36 +3,39 @@ const morgan = require("morgan");
 const cors = require("cors");
 const path = require("path");
 
+const app = express();
+
+// ========================================
+// ENVIRONMENT VARIABLES
+// ========================================
+
 require("dotenv").config({
   path: "./config/index.env",
 });
 
-const app = express();
-
 // ========================================
-// CORS - ALLOW ALL ORIGINS
+// CORS - ALLOW EVERYTHING
 // ========================================
 
-app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "*");
-  res.header(
-    "Access-Control-Allow-Methods",
-    "GET,POST,PUT,DELETE,PATCH,OPTIONS"
-  );
-  res.header(
-    "Access-Control-Allow-Headers",
-    "Origin, X-Requested-With, Content-Type, Accept, Authorization"
-  );
+app.use(cors({
+  origin: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: false,
+}));
 
-  if (req.method === "OPTIONS") {
-    return res.sendStatus(204);
-  }
+// ========================================
+// BODY PARSING
+// ========================================
 
-  next();
-});
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// Also keep cors middleware
-app.use(cors());
+// ========================================
+// LOGGER
+// ========================================
+
+app.use(morgan("dev"));;
 
 // ========================================
 // BODY PARSING
@@ -121,7 +124,7 @@ app.use((req, res) => {
 });
 
 // ========================================
-// GLOBAL ERROR
+// GLOBAL ERROR HANDLER
 // ========================================
 
 app.use((err, req, res, next) => {
