@@ -12,6 +12,13 @@ const sendEmail = async ({ to, subject, html }) => {
       },
     });
 
+    console.log("📧 Sending OTP email...");
+    console.log("📧 From:", process.env.EMAIL_USER);
+    console.log("📧 To:", to);
+
+    await transporter.verify();
+    console.log("✅ SMTP connection verified");
+
     const info = await transporter.sendMail({
       from: `"AutoTest OTP" <${process.env.EMAIL_USER}>`,
       to,
@@ -19,20 +26,16 @@ const sendEmail = async ({ to, subject, html }) => {
       html,
     });
 
-    // ✅ IMPORTANT CHECK
-    if (!info.accepted || info.accepted.length === 0) {
-      throw new Error("Email not accepted");
-    }
-
     console.log("✅ Email sent:", info.messageId);
+    console.log("📧 Accepted:", info.accepted);
+    console.log("📧 Rejected:", info.rejected);
 
     return true;
 
   } catch (error) {
-    console.error("❌ Email send failed:", error.message);
-
-    // ❌ THROW ERROR (not return false)
-    throw new Error("Email delivery failed");
+    console.error("❌ EMAIL ERROR:");
+    console.error(error);
+    throw error;
   }
 };
 
