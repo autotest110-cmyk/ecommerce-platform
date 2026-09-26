@@ -3,32 +3,25 @@ const nodemailer = require("nodemailer");
 const sendEmail = async ({ to, subject, html }) => {
   try {
     const transporter = nodemailer.createTransport({
-      host: "smtp.gmail.com",
-      port: 465,
-      secure: true,
-      family: 4,
+      service: "gmail",
       auth: {
         user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
+        pass: process.env.EMAIL_PASS, // Gmail App Password
       },
     });
 
-    const info = await transporter.sendMail({
+    await transporter.sendMail({
       from: `"AutoTest OTP" <${process.env.EMAIL_USER}>`,
       to,
       subject,
       html,
     });
 
-    console.log("✅ OTP email sent:", info.messageId);
-
-    return true;
-
+    console.log("✅ Email sent to:", to);
   } catch (error) {
-    console.error("❌ OTP email failed:", error.message);
-    throw error;
+    console.error("❌ Email send failed:", error.message);
+    throw new Error("Email could not be sent");
   }
 };
 
 module.exports = sendEmail;
-
