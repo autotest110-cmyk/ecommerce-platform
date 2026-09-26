@@ -31,16 +31,48 @@ router.post("/register", async (req, res) => {
     }
 
     // ✅ 🔥 REAL EMAIL CHECK (NEW)
-    const validation = await emailValidator.validate(email);
+// ✅ EMAIL VALIDATION
+const validation = await emailValidator.validate(email);
 
-    console.log("📧 EMAIL VALIDATION:", validation);
+console.log("📧 EMAIL VALIDATION:", validation);
 
-    if (!validation.valid) {
-      return res.status(400).json({
-        success: false,
-        message: "Email does not exist or is invalid",
-      });
-    }
+// Reject only if basic email/domain checks fail
+if (!validation.validators.regex.valid) {
+  return res.status(400).json({
+    success: false,
+    message: "Please enter a valid email address.",
+  });
+}
+
+if (!validation.validators.typo.valid) {
+  return res.status(400).json({
+    success: false,
+    message: "Please check the email address for typing errors.",
+  });
+}
+
+if (!validation.validators.disposable.valid) {
+  return res.status(400).json({
+    success: false,
+    message: "Disposable email addresses are not allowed.",
+  });
+}
+
+if (!validation.validators.mx.valid) {
+  return res.status(400).json({
+    success: false,
+    message: "This email domain cannot receive emails.",
+  });
+}
+
+// SMTP verification is not mandatory.
+// Some legitimate email providers block SMTP mailbox verification.
+if (!validation.validators.smtp.valid) {
+  console.warn(
+    "⚠️ SMTP verification failed, continuing with OTP verification:",
+    validation.validators.smtp.reason
+  );
+}
 
     let user = await User.findOne({ email });
 
