@@ -3,40 +3,61 @@ const morgan = require("morgan");
 const cors = require("cors");
 const path = require("path");
 
-const app = express();
-
-// Load environment variables
 require("dotenv").config({
   path: "./config/index.env",
 });
 
-// ========================================
-// CORS - ALLOW EVERYTHING
-// ========================================
-app.use(cors());
+const app = express();
 
-app.options("*", cors());
+// ========================================
+// CORS - ALLOW ALL ORIGINS
+// ========================================
+
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header(
+    "Access-Control-Allow-Methods",
+    "GET,POST,PUT,DELETE,PATCH,OPTIONS"
+  );
+  res.header(
+    "Access-Control-Allow-Headers",
+    "Origin, X-Requested-With, Content-Type, Accept, Authorization"
+  );
+
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(204);
+  }
+
+  next();
+});
+
+// Also keep cors middleware
+app.use(cors());
 
 // ========================================
 // BODY PARSING
 // ========================================
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // ========================================
-// MongoDB
+// LOGGER
 // ========================================
+
+app.use(morgan("dev"));
+
+// ========================================
+// MONGODB
+// ========================================
+
 const connectDB = require("./config/db");
 connectDB();
 
 // ========================================
-// Logger
+// STATIC FILES
 // ========================================
-app.use(morgan("dev"));
 
-// ========================================
-// Static files
-// ========================================
 app.use(
   "/uploads",
   express.static(path.join(__dirname, "uploads"))
@@ -100,7 +121,7 @@ app.use((req, res) => {
 });
 
 // ========================================
-// GLOBAL ERROR HANDLER
+// GLOBAL ERROR
 // ========================================
 
 app.use((err, req, res, next) => {
