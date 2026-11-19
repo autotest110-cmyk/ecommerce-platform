@@ -1,10 +1,12 @@
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const auth = require('../middleware/auth');
 const User = require('../models/User');
 const sendEmail = require("../utils/sendEmail");
+const Product = require('../models/Product');
 
 /* ===============================
    GET CURRENT USER
@@ -213,5 +215,128 @@ router.post("/admin-login", async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
+
+/* ===============================
+   WISHLIST APIs
+================================ */
+
+// GET USER WISHLIST
+router.get('/wishlist', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id)
+      .populate('wishlist')
+      .select('wishlist');
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+      });
+    }
+
+    res.json({
+      success: true,
+      wishlist: user.wishlist || [],
+    });
+  } catch (error) {
+    console.error('GET WISHLIST ERROR:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Unable to fetch wishlist',
+    });
+  }
+});
+
+// ADD PRODUCT TO WISHLIST
+router.post('/wishlist/:productId', auth, async (req, res) => {
+  try {
+    const { productId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid product ID',
+      });
+    }
+
+    const product = await Product.findById(productId);
+
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found',
+      });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      {
+        $addToSet: { wishlist: product._id },
+      },
+      { new: true }
+    ).populate('wishlist');
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Added to favorites',
+      wishlist: user.wishlist,
+    });
+  } catch (error) {
+    console.error('ADD WISHLIST ERROR:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Unable to add favorite',
+    });
+  }
+});
+
+// REMOVE PRODUCT FROM WISHLIST
+router.delete('/wishlist/:productId', auth, async (req, res) => {
+  try {
+    const { productId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid product ID',
+      });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      {
+        $pull: { wishlist: productId },
+      },
+      { new: true }
+    ).populate('wishlist');
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Removed from favorites',
+      wishlist: user.wishlist,
+    });
+  } catch (error) {
+    console.error('REMOVE WISHLIST ERROR:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Unable to remove favorite',
+    });
+  }
+});
+
 
 module.exports = router;
