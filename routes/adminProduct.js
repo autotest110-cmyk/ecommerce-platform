@@ -1,3 +1,4 @@
+
 const express = require("express");
 const router = express.Router();
 
@@ -25,6 +26,7 @@ router.post(
         quantity,
         category,
         isFeatured,
+        gender,
         variants,
       } = req.body;
 
@@ -34,10 +36,20 @@ router.post(
         });
       }
 
+      // Validate gender
+      const allowedGenders = ["men", "women", "unisex", "kids"];
+      const productGender = gender || "unisex";
+
+      if (!allowedGenders.includes(productGender)) {
+        return res.status(400).json({
+          message: "Invalid gender. Use men, women, unisex or kids.",
+        });
+      }
+
       let photo = "";
       let public_id = "";
 
-      // ✅ Upload to Cloudinary (FIXED)
+      // Upload image to Cloudinary
       if (req.file) {
         const result = await new Promise((resolve, reject) => {
           const stream = cloudinary.uploader.upload_stream(
@@ -47,6 +59,7 @@ router.post(
               else resolve(result);
             }
           );
+
           stream.end(req.file.buffer);
         });
 
@@ -60,7 +73,9 @@ router.post(
         price,
         quantity,
         category,
-        isFeatured,
+        isFeatured:
+          isFeatured === "true" || isFeatured === true,
+        gender: productGender,
         photo,
         public_id,
         variants: variants ? JSON.parse(variants) : [],
@@ -71,7 +86,9 @@ router.post(
       res.status(201).json(product);
     } catch (err) {
       console.error("CREATE ERROR:", err);
-      res.status(500).json({ message: "Create failed" });
+      res.status(500).json({
+        message: "Create failed",
+      });
     }
   }
 );
@@ -84,7 +101,10 @@ router.get("/", auth, adminAuth, async (req, res) => {
     const products = await Product.find().populate("category");
     res.json(products);
   } catch (err) {
-    res.status(500).json({ message: "Failed to fetch products" });
+    console.error("FETCH PRODUCTS ERROR:", err);
+    res.status(500).json({
+      message: "Failed to fetch products",
+    });
   }
 });
 
@@ -93,15 +113,22 @@ router.get("/", auth, adminAuth, async (req, res) => {
 ================================ */
 router.get("/:id", auth, adminAuth, async (req, res) => {
   try {
-    const product = await Product.findById(req.params.id).populate("category");
+    const product = await Product.findById(req.params.id).populate(
+      "category"
+    );
 
     if (!product) {
-      return res.status(404).json({ message: "Product not found" });
+      return res.status(404).json({
+        message: "Product not found",
+      });
     }
 
     res.json(product);
   } catch (err) {
-    res.status(500).json({ message: "Failed to fetch product" });
+    console.error("FETCH PRODUCT ERROR:", err);
+    res.status(500).json({
+      message: "Failed to fetch product",
+    });
   }
 });
 
@@ -115,10 +142,12 @@ router.put(
   upload.single("photo"),
   async (req, res) => {
     try {
-      let product = await Product.findById(req.params.id);
+      const product = await Product.findById(req.params.id);
 
       if (!product) {
-        return res.status(404).json({ message: "Product not found" });
+        return res.status(404).json({
+          message: "Product not found",
+        });
       }
 
       const {
@@ -128,24 +157,50 @@ router.put(
         quantity,
         category,
         isFeatured,
+        gender,
         variants,
       } = req.body;
 
-      // ✅ Update fields
-      if (name) product.name = name;
-      if (description) product.description = description;
-      if (price) product.price = price;
-      if (quantity) product.quantity = quantity;
-      if (category) product.category = category;
-      if (isFeatured !== undefined) product.isFeatured = isFeatured;
+      // Update basic fields
+      if (name !== undefined) product.name = name;
+      if (description !== undefined) {
+        product.description = description;
+      }
+      if (price !== undefined && price !== "") {
+        product.price = price;
+      }
+      if (quantity !== undefined && quantity !== "") {
+        product.quantity = quantity;
+      }
+      if (category !== undefined && category !== "") {
+        product.category = category;
+      }
 
-      // ✅ Upload new image (FIXED)
-      if (req.file) {
-        // 🔥 delete old image
-        if (product.public_id) {
-          await cloudinary.uploader.destroy(product.public_id);
+      if (isFeatured !== undefined) {
+        product.isFeatured =
+          isFeatured === "true" || isFeatured === true;
+      }
+
+      // Update gender
+      if (gender !== undefined && gender !== "") {
+        const allowedGenders = [
+          "men",
+          "women",
+          "unisex",
+          "kids",
+        ];
+
+        if (!allowedGenders.includes(gender)) {
+          return res.status(400).json({
+            message: "Invalid gender. Use men, women, unisex or kids.",
+          });
         }
 
+        product.gender = gender;
+      }
+
+      // Upload new image to Cloudinary
+      if (req.file) {
         const result = await new Promise((resolve, reject) => {
           const stream = cloudinary.uploader.upload_stream(
             { folder: "products" },
@@ -154,16 +209,24 @@ router.put(
               else resolve(result);
             }
           );
+
           stream.end(req.file.buffer);
         });
+
+        // Delete previous image after new upload succeeds
+        if (product.public_id) {
+          await cloudinary.uploader.destroy(product.public_id);
+        }
 
         product.photo = result.secure_url;
         product.public_id = result.public_id;
       }
 
-      // ✅ Variants
-      if (variants) {
-        product.variants = JSON.parse(variants);
+      // Update variants
+      if (variants !== undefined) {
+        product.variants = variants
+          ? JSON.parse(variants)
+          : [];
       }
 
       await product.save();
@@ -171,7 +234,9 @@ router.put(
       res.json(product);
     } catch (err) {
       console.error("UPDATE ERROR:", err);
-      res.status(500).json({ message: "Update failed" });
+      res.status(500).json({
+        message: "Update failed",
+      });
     }
   }
 );
@@ -183,15 +248,26 @@ router.delete("/:id", auth, adminAuth, async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
 
-    if (product?.public_id) {
+    if (!product) {
+      return res.status(404).json({
+        message: "Product not found",
+      });
+    }
+
+    if (product.public_id) {
       await cloudinary.uploader.destroy(product.public_id);
     }
 
     await Product.findByIdAndDelete(req.params.id);
 
-    res.json({ message: "Product deleted successfully" });
+    res.json({
+      message: "Product deleted successfully",
+    });
   } catch (err) {
-    res.status(500).json({ message: "Product delete failed" });
+    console.error("DELETE PRODUCT ERROR:", err);
+    res.status(500).json({
+      message: "Product delete failed",
+    });
   }
 });
 
