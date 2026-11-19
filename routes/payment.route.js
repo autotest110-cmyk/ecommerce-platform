@@ -1,23 +1,42 @@
 const express = require("express");
 const router = express.Router();
+
 const stripe = require("../config/stripe");
-const auth = require("../middleware/auth");
-console.log("STRIPE TYPE 👉", typeof stripe);
-router.post("/create-payment-intent", auth, async (req, res) => {
+const optionalAuth = require("../middleware/optionalAuth");
+
+router.post("/create-payment-intent", optionalAuth, async (req, res) => {
   try {
-    const { amount } = req.body; // amount in dollars
+    const { amount } = req.body;
+
+    if (
+      amount === undefined ||
+      !Number.isFinite(Number(amount)) ||
+      Number(amount) <= 0
+    ) {
+      return res.status(400).json({
+        message: "Valid payment amount is required",
+      });
+    }
 
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(amount * 100), // cents
-      currency: "usd",
-      metadata: { userId: req.user.id }
+      amount: Math.round(Number(amount) * 100),
+      currency: "inr",
+      metadata: {
+        userId: req.user?.id || "guest",
+        checkoutType: req.user?.id ? "registered" : "guest",
+      },
     });
 
     res.json({
-      clientSecret: paymentIntent.client_secret
+      clientSecret: paymentIntent.client_secret,
+      paymentIntentId: paymentIntent.id,
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("STRIPE ERROR:", error);
+
+    res.status(500).json({
+      message: "Payment initialization failed",
+    });
   }
 });
 

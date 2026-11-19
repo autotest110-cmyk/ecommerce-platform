@@ -2,11 +2,21 @@ const mongoose = require("mongoose");
 
 const orderSchema = new mongoose.Schema(
   {
-    user: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-    },
+   user: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: "User",
+  default: null,
+},
+
+isGuestOrder: {
+  type: Boolean,
+  default: false,
+},
+
+customerEmail: {
+  type: String,
+  default: "",
+},
 
     orderItems: [
       {
