@@ -1,3 +1,4 @@
+
 const express = require("express");
 const morgan = require("morgan");
 const cors = require("cors");
@@ -14,28 +15,34 @@ require("dotenv").config({
 });
 
 // ========================================
-// CORS - ALLOW EVERYTHING
+// CORS CONFIGURATION
 // ========================================
 
-app.use(cors({
+const corsOptions = {
   origin: true,
-  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
+
+  methods: [
+    "GET",
+    "POST",
+    "PUT",
+    "PATCH",
+    "DELETE",
+    "OPTIONS",
+  ],
+
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "x-order-access-token",
+  ],
+
   credentials: false,
-}));
+};
 
-// ========================================
-// BODY PARSING
-// ========================================
+app.use(cors(corsOptions));
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// ========================================
-// LOGGER
-// ========================================
-
-app.use(morgan("dev"));;
+// Handle browser preflight requests
+app.options("*", cors(corsOptions));
 
 // ========================================
 // BODY PARSING
@@ -119,7 +126,7 @@ app.get("/", (req, res) => {
 
 app.use((req, res) => {
   res.status(404).json({
-    msg: "Page not founded",
+    msg: "Page not found",
   });
 });
 
@@ -128,7 +135,7 @@ app.use((req, res) => {
 // ========================================
 
 app.use((err, req, res, next) => {
-  console.error("🔥 GLOBAL ERROR:", err);
+  console.error("GLOBAL ERROR:", err);
 
   res.status(500).json({
     message: err.message || "Server Error",
@@ -138,4 +145,5 @@ app.use((err, req, res, next) => {
 // ========================================
 // SERVER
 // ========================================
+
 module.exports = app;
