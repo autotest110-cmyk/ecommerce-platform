@@ -69,6 +69,11 @@ customerEmail: {
       type: Number,
       required: true,
     },
+    guestAccessTokenHash: {
+  type: String,
+  default: null,
+  select: false,
+},
 
     /* ✅ BETTER STATUS FLOW */
     status: {

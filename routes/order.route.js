@@ -1,3 +1,4 @@
+
 const express = require("express");
 const router = express.Router();
 
@@ -6,65 +7,18 @@ const auth = require("../middleware/auth");
 const optionalAuth = require("../middleware/optionalAuth");
 const adminAuth = require("../middleware/adminAuth");
 
-/* ===============================
-   CREATE ORDER - USER OR GUEST
-================================ */
-router.post("/", optionalAuth, async (req, res) => {
-  try {
-    const {
-      orderItems,
-      shippingAddress,
-      paymentMethod,
-      totalPrice,
-      customerEmail,
-    } = req.body;
+const {
+  createOrder,
+  getGuestOrder,
+} = require("../controllers/orderController");
 
-    if (!orderItems || orderItems.length === 0) {
-      return res.status(400).json({ message: "No order items" });
-    }
+// Create order - registered customer or guest
+router.post("/", optionalAuth, createOrder);
 
-    if (!shippingAddress) {
-      return res.status(400).json({
-        message: "Shipping address is required",
-      });
-    }
+// Guest order details - requires guest access token
+router.get("/guest/:id", getGuestOrder);
 
-    const isLoggedIn = Boolean(req.user?.id);
-    const finalEmail =
-      customerEmail || shippingAddress.email || "";
-
-    if (!isLoggedIn && !finalEmail) {
-      return res.status(400).json({
-        message: "Email is required for guest checkout",
-      });
-    }
-
-    const order = new Order({
-      user: isLoggedIn ? req.user.id : null,
-      isGuestOrder: !isLoggedIn,
-      customerEmail: finalEmail,
-      orderItems,
-      shippingAddress,
-      paymentMethod,
-      totalPrice,
-    });
-
-    const created = await order.save();
-
-    return res.status(201).json(created);
-  } catch (err) {
-    console.error("CREATE ORDER ERROR:", err);
-
-    return res.status(500).json({
-      error: "Order creation failed",
-      message: err.message,
-    });
-  }
-});
-
-/* ===============================
-   GET USER ORDERS
-================================ */
+// Registered customer orders
 router.get("/myorders", auth, async (req, res) => {
   try {
     const orders = await Order.find({ user: req.user.id })
@@ -73,13 +27,13 @@ router.get("/myorders", auth, async (req, res) => {
 
     res.json(orders);
   } catch (err) {
-    res.status(500).json({ message: "Could not fetch orders" });
+    res.status(500).json({
+      message: "Could not fetch orders",
+    });
   }
 });
 
-/* ===============================
-   GET ALL ORDERS - ADMIN
-================================ */
+// Admin - all orders
 router.get("/", auth, adminAuth, async (req, res) => {
   try {
     const orders = await Order.find()
@@ -88,19 +42,21 @@ router.get("/", auth, adminAuth, async (req, res) => {
 
     res.json(orders);
   } catch (err) {
-    res.status(500).json({ message: "Could not fetch orders" });
+    res.status(500).json({
+      message: "Could not fetch orders",
+    });
   }
 });
 
-/* ===============================
-   UPDATE STATUS - ADMIN
-================================ */
+// Admin - update order status
 router.put("/:id/status", auth, adminAuth, async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
 
     if (!order) {
-      return res.status(404).json({ message: "Order not found" });
+      return res.status(404).json({
+        message: "Order not found",
+      });
     }
 
     order.status = req.body.status;
@@ -110,9 +66,12 @@ router.put("/:id/status", auth, adminAuth, async (req, res) => {
     }
 
     await order.save();
+
     res.json(order);
   } catch (err) {
-    res.status(500).json({ message: "Status update failed" });
+    res.status(500).json({
+      message: "Status update failed",
+    });
   }
 });
 

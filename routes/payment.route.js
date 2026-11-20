@@ -1,3 +1,4 @@
+
 const express = require("express");
 const router = express.Router();
 
@@ -6,7 +7,7 @@ const optionalAuth = require("../middleware/optionalAuth");
 
 router.post("/create-payment-intent", optionalAuth, async (req, res) => {
   try {
-    const { amount } = req.body;
+    const { amount, customerEmail } = req.body;
 
     if (
       amount === undefined ||
@@ -21,9 +22,11 @@ router.post("/create-payment-intent", optionalAuth, async (req, res) => {
     const paymentIntent = await stripe.paymentIntents.create({
       amount: Math.round(Number(amount) * 100),
       currency: "inr",
+      receipt_email: customerEmail || undefined,
       metadata: {
         userId: req.user?.id || "guest",
         checkoutType: req.user?.id ? "registered" : "guest",
+        customerEmail: customerEmail || "",
       },
     });
 
